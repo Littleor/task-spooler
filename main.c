@@ -17,6 +17,7 @@
 
 #include "version.h"
 #include "main.h"
+#include "feishu.h"
 
 extern char *optarg;
 extern int optind, opterr, optopt;
@@ -122,6 +123,9 @@ static struct option longOptions[] = {
         {"unsetenv",           required_argument, NULL, 0},
         {"get_logdir",         no_argument,       NULL, 0},
         {"set_logdir",         required_argument, NULL, 0},
+        {"set_feishu_webhook", required_argument, NULL, 0},
+        {"get_feishu_webhook", no_argument,       NULL, 0},
+        {"unset_feishu_webhook", no_argument,     NULL, 0},
 #ifndef CPU
         {"gpus",              required_argument, NULL, 'G'},
         {"gpu_indices",       required_argument, NULL, 'g'},
@@ -152,7 +156,25 @@ void parse_opts(int argc, char **argv) {
 
         switch (c) {
             case 0:
-                if (strcmp(longOptions[optionIdx].name, "getenv") == 0) {
+                if (strcmp(longOptions[optionIdx].name, "set_feishu_webhook") == 0) {
+                    size_t size;
+                    if (!feishu_valid_webhook(optarg)) {
+                        fprintf(stderr, "Invalid Feishu webhook: use an HTTPS URL.\n");
+                        exit(EXIT_FAILURE);
+                    }
+                    size = strlen(optarg) + sizeof("TS_FEISHU_WEBHOOK=");
+                    command_line.label = malloc(size);
+                    if (!command_line.label)
+                        error("Cannot allocate webhook configuration");
+                    sprintf(command_line.label, "TS_FEISHU_WEBHOOK=%s", optarg);
+                    command_line.request = c_SET_ENV;
+                } else if (strcmp(longOptions[optionIdx].name, "get_feishu_webhook") == 0) {
+                    command_line.request = c_GET_ENV;
+                    command_line.label = "TS_FEISHU_WEBHOOK";
+                } else if (strcmp(longOptions[optionIdx].name, "unset_feishu_webhook") == 0) {
+                    command_line.request = c_UNSET_ENV;
+                    command_line.label = "TS_FEISHU_WEBHOOK";
+                } else if (strcmp(longOptions[optionIdx].name, "getenv") == 0) {
                     command_line.request = c_GET_ENV;
                     command_line.label = optarg;  /* reuse this var */
                 } else if (strcmp(longOptions[optionIdx].name, "setenv") == 0) {
@@ -494,8 +516,12 @@ static void print_help(const char *cmd) {
     printf("  TS_ENV              command called on enqueue. Its output determines the job information.\n");
     printf("  TS_SAVELIST         filename which will store the list, if the server dies.\n");
     printf("  TS_SLOTS            amount of jobs which can run at once, read on server start.\n");
+    printf("  TS_FEISHU_WEBHOOK    Feishu bot webhook; notify on job submission, start and completion.\n");
     printf("  TMPDIR              directory where to place the output files and the default socket.\n");
     printf("Long option actions:\n");
+    printf("  --set_feishu_webhook [url]             enable Feishu notifications for this queue.\n");
+    printf("  --get_feishu_webhook                   show this queue's webhook (empty if disabled).\n");
+    printf("  --unset_feishu_webhook                 disable future Feishu notifications.\n");
     printf("  --getenv [var]                         get the value of the specified variable in server environment.\n");
     printf("  --setenv [var]                         set the specified flag to server environment.\n");
     printf("  --unsetenv [var]                       remove the specified flag from server environment.\n");

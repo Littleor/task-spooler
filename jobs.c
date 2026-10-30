@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 
 #include "main.h"
+#include "feishu.h"
 #include "cjson/cJSON.h"
 
 /* The list will access them */
@@ -576,6 +577,7 @@ void s_list_gpu(int s) {
 static void init_job(struct Job *p) {
     p->next = 0;
     p->output_filename = 0;
+    p->pid = 0;
     p->command = 0;
     p->depend_on = 0;
     p->depend_on_size = 0;
@@ -1030,6 +1032,8 @@ void job_finished(const struct Result *result, int jobid) {
     last_finished_jobid = p->jobid;
     notify_errorlevel(p);
     pinfo_set_end_time(&p->info);
+    feishu_notify(p, result->skipped ? "skipped" :
+                  (result->errorlevel || result->died_by_signal) ? "failed" : "succeeded");
 
     if (p->result.died_by_signal)
         pinfo_addinfo(&p->info, 100, "Exit status: killed by signal %i\n", p->result.signal);
@@ -1097,6 +1101,8 @@ void s_process_runjob_ok(int jobid, char *oname, int pid) {
     p->pid = pid;
     p->output_filename = oname;
     pinfo_set_start_time(&p->info);
+    if (pid > 0)
+        feishu_notify(p, "running");
 }
 
 void s_send_runjob(int s, int jobid) {
@@ -1819,12 +1825,18 @@ void s_set_env(int s, int size) {
         error("Receiving environment variable name");
 
     /* get the var name */
-    char *name = strtok(var, "=");
-
-    /* get the var value */
-    char *val = strtok(NULL, "=");
-    setenv(name, val, 1);
+    char *val = strchr(var, '=');
+    if (val) {
+        *val++ = '\0';
+        setenv(var, val, 1);
+    }
     free(var);
+}
+
+void s_notify_job_submitted(int jobid) {
+    struct Job *job = findjob(jobid);
+    if (job)
+        feishu_notify(job, "submitted");
 }
 
 void s_unset_env(int s, int size) {

@@ -801,6 +801,20 @@ int main() {
                      ".B ts.", tm.tm_year + 1900, tm.tm_mon + 1, TS_MAKE_STR(TS_VERSION), TS_MAKE_STR(TS_VERSION));
 #endif
     fprintf(f, "%s", manPage);
+    fputs("\n.SH FEISHU NOTIFICATIONS\n"
+          "Set a queue-wide Feishu custom bot webhook with\n"
+          ".B ts --set_feishu_webhook URL\n"
+          "and inspect or disable it with\n"
+          ".B --get_feishu_webhook\n"
+          "or\n"
+          ".B --unset_feishu_webhook.\n"
+          "The setting lasts until the server exits. Export TS_FEISHU_WEBHOOK\n"
+          "before starting the server to configure it on startup.\n"
+          "Notifications cover submission, start, success, failure and dependency skips.\n"
+          "Messages are sent asynchronously in order; delivery errors do not change job results.\n"
+          "Delivery is best effort, with no retries and a 256-message pending queue.\n"
+          "Errors are logged to the socket path followed by .error.\n"
+          "A graceful -K drains pending messages before exiting.\n", f);
     fclose(f);
     return 0;
 }

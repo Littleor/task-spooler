@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.5)
 project(Task-Spooler C)
 
+find_package(CURL REQUIRED)
+find_package(Threads REQUIRED)
+
 set(CMAKE_C_STANDARD 11)
 
 option(TASK_SPOOLER_COMPILE_CUDA "Compile CUDA support (NVML)" ON)
@@ -27,6 +30,8 @@ set(TASK_SPOOLER_SOURCES
         env.c
         error.c
         execute.c
+        feishu.c
+        feishu_card.c
         info.c
         jobs.c
         list.c
@@ -51,6 +56,7 @@ add_executable(
 )
 
 add_executable(makeman man.c)
+target_link_libraries(${target} CURL::libcurl Threads::Threads)
 
 if(TASK_SPOOLER_COMPILE_CUDA)
   if(${CMAKE_VERSION} VERSION_LESS "3.17.0") 

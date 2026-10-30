@@ -324,6 +324,7 @@ void c_set_logdir();
 char* get_logdir();
 
 /* jobs.c */
+void s_notify_job_submitted(int jobid);
 void s_list(int s, enum ListFormat listFormat);
 
 #ifndef CPU

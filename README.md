@@ -35,6 +35,73 @@ just forget `CUDA_VISIBLE_DEVICES`.
 
 See the installation steps in [INSTALL.md](INSTALL.md).
 
+## Feishu notifications
+
+This fork can notify a Feishu custom bot whenever a job is accepted, starts,
+succeeds, or fails. CPU and GPU jobs use the same notification path.
+
+```bash
+# Configure the running queue (replace the placeholder with your bot's URL).
+ts --set_feishu_webhook 'https://open.feishu.cn/open-apis/bot/v2/hook/YOUR_TOKEN'
+ts --get_feishu_webhook
+
+# Submit jobs normally; no per-job notification flag is required.
+ts -G 2 -L evaluation python eval.py
+ts -G 4 bash -lc 'cd /data/project && python eval.py'
+
+# Disable notifications for future events.
+ts --unset_feishu_webhook
+```
+
+The configuration belongs to the **server/queue**, not the submitting terminal.
+All users sharing a queue must use the same `TS_SOCKET` and have access to that
+socket. These options do not merge separate users' default queues or change
+scheduling policy. They reuse the existing server environment protocol; restart
+any older running `ts` server after installing this version.
+
+CLI settings last until the queue server exits. To enable notifications after
+every restart, export `TS_FEISHU_WEBHOOK` in the environment that starts the server
+(for example, in its service configuration). Exporting it in a new shell does
+not update a server that is already running; use `--set_feishu_webhook` instead.
+`--get_feishu_webhook` prints the full configured URL; an empty line means disabled.
+
+Messages are Feishu JSON 2.0 cards with rendered Markdown and Chinese status
+headings. Blue/cyan mark submission/start, green marks success, red marks failure,
+and orange marks skipped jobs. Labels, resource details, results, shell command
+code blocks and log paths are arranged in separate sections. Cards include the
+host, job ID, event time (with timezone), requested GPU count, allocated GPU IDs,
+PID, exit status, termination signal and elapsed seconds as applicable. A job skipped
+because of `-W` dependencies produces `submitted` and `skipped`, without a false
+`running` event. A normal job produces exactly three events:
+`submitted`, `running`, and either `succeeded` or `failed`.
+
+A single background thread sends messages in event order. Sending uses libcurl
+with a 2-second connection timeout and a 5-second total timeout per message;
+network latency and bot errors do not block scheduling or change job exit codes.
+HTTP errors, nonzero Feishu response codes, and malformed responses are logged
+to the queue socket path plus `.error` (for example, `$TS_SOCKET.error`). Webhook
+URLs and response bodies are not included in notification error messages.
+
+Delivery is best effort: there is no retry (to avoid duplicate bot messages),
+the in-memory queue holds at most 256 waiting notifications, and overflow is
+logged. A graceful `ts -K` drains pending messages before the server exits, which
+may take time if the endpoint is unavailable. Abrupt termination can lose pending
+messages. Disabling or replacing the webhook affects future events; messages
+already waiting retain their original destination.
+
+Use an HTTPS webhook. HTTP loopback URLs are also accepted for local tests.
+Bots with keyword restrictions must allow `Task Spooler`. Bot signature-secret
+verification is not implemented; this integration uses the webhook token.
+
+Build dependencies include libcurl development headers and POSIX threads; see
+[INSTALL.md](INSTALL.md). Run the local HTTP integration tests with:
+
+```bash
+cmake -S . -B build -DTASK_SPOOLER_COMPILE_CUDA=OFF
+cmake --build build
+TS_BINARY=./build/ts python3 -m unittest discover -s tests -v
+```
+
 ## Changelog
 
 See [CHANGELOG](CHANGELOG.md).
