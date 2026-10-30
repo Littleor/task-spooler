@@ -102,6 +102,27 @@ cmake --build build
 TS_BINARY=./build/ts python3 -m unittest discover -s tests -v
 ```
 
+## Queue priority
+
+```bash
+ts -u 12  # Make waiting job 12 the first waiting job.
+ts -u     # Promote the last submitted job that is still in the active queue.
+```
+
+Promotion places the selected waiting job after all running jobs and before
+all other waiting jobs. With no running jobs, it becomes the queue head, even
+if the old head is waiting for GPUs. Other running and waiting jobs retain
+their relative order within each group. Running jobs are never interrupted.
+Promoting the waiting head again (including a queue with just one waiting job)
+is a safe no-op. A running, finished, unknown, or not-yet-admitted job returns
+an error without changing the queue. Omitting the ID selects the most recently
+submitted active job, even after previous queue reordering.
+
+Promotion changes priority only: GPU availability, execution slots and job
+dependencies still determine whether the task can start. Existing servers
+must be restarted after their queues drain to pick up this fix; changing the
+binary does not update a running server's in-memory queue.
+
 ## Changelog
 
 See [CHANGELOG](CHANGELOG.md).
@@ -179,7 +200,7 @@ Actions (can be performed only one at a time):
   -w [id]      wait for a job. The last added, if not specified.
   -k [id]      send SIGTERM to the job process group. The last run, if not specified.
   -T           send SIGTERM to all running job groups.
-  -u [id]      put that job first. The last added, if not specified.
+  -u [id]      promote a waiting job ahead of other waiting jobs, after running jobs. Last added by default.
   -U [id-id]   swap two jobs in the queue.
   -B           in case of full queue on the server, quit (2) instead of waiting.
   -h           show this help

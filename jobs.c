@@ -1609,36 +1609,55 @@ void s_get_max_slots(int s) {
 
 void s_move_urgent(int s, int jobid) {
     struct Job *p = 0;
-    struct Job *tmp1;
+    struct Job **link;
+    struct Job *running = NULL, *waiting = NULL, *cursor;
+    struct Job **running_tail = &running, **waiting_tail = &waiting;
 
     if (jobid == -1) {
-        /* Find the last job added */
-        p = firstjob;
-
-        if (p != 0)
-            while (p->next != 0)
-                p = p->next;
+        /* Queue order can change; the highest ID is the last job added. */
+        for (cursor = firstjob; cursor; cursor = cursor->next)
+            if (!p || cursor->jobid > p->jobid)
+                p = cursor;
     } else {
         p = firstjob;
         while (p != 0 && p->jobid != jobid)
             p = p->next;
     }
 
-    if (p == 0 || firstjob->next == 0) {
-        char tmp[50];
+    if (!p || (p->state != QUEUED && p->state != ALLOCATING)) {
+        char tmp[128];
         if (jobid == -1)
-            sprintf(tmp, "The last job cannot be urged.\n");
+            sprintf(tmp, "The last added job is not waiting in the queue.\n");
         else
-            sprintf(tmp, "The job %i cannot be urged.\n", jobid);
+            sprintf(tmp, "Job %i is not waiting in the queue.\n", jobid);
         send_list_line(s, tmp);
         return;
     }
 
-    /* Interchange the pointers */
-    tmp1 = find_previous_job(p);
-    tmp1->next = p->next;
-    p->next = firstjob->next;
-    firstjob->next = p;
+    /* Unlink through the owning pointer, including when p is firstjob. */
+    link = &firstjob;
+    while (*link != p)
+        link = &(*link)->next;
+    *link = p->next;
+
+    /* Backfilling may have left waiting jobs ahead of running jobs. Keep
+     * both groups stable, then put p before every other waiting job. */
+    cursor = firstjob;
+    while (cursor) {
+        struct Job *next = cursor->next;
+        cursor->next = NULL;
+        if (cursor->state == RUNNING) {
+            *running_tail = cursor;
+            running_tail = &cursor->next;
+        } else {
+            *waiting_tail = cursor;
+            waiting_tail = &cursor->next;
+        }
+        cursor = next;
+    }
+    *running_tail = p;
+    p->next = waiting;
+    firstjob = running;
     send_urgent_ok(s);
 }
 

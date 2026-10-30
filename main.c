@@ -557,7 +557,7 @@ static void print_help(const char *cmd) {
     printf("  -w [id]      wait for a job. The last added, if not specified.\n");
     printf("  -k [id]      send SIGTERM to the job process group. The last run, if not specified.\n");
     printf("  -T           send SIGTERM to all running job groups.\n");
-    printf("  -u [id]      put that job first. The last added, if not specified.\n");
+    printf("  -u [id]      promote a waiting job ahead of other waiting jobs, after running jobs. Last added by default.\n");
     printf("  -U [id-id]   swap two jobs in the queue.\n");
     printf("  -h           show this help\n");
     printf("  -V           show the program version\n");
